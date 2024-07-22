@@ -1,118 +1,90 @@
-/**
- * Sample React Native App
- * https://github.com/facebook/react-native
- *
- * @format
- */
-
-import React from 'react';
-import type {PropsWithChildren} from 'react';
-import {
-  SafeAreaView,
-  ScrollView,
-  StatusBar,
-  StyleSheet,
-  Text,
-  useColorScheme,
-  View,
-} from 'react-native';
-
-import {
-  Colors,
-  DebugInstructions,
-  Header,
-  LearnMoreLinks,
-  ReloadInstructions,
-} from 'react-native/Libraries/NewAppScreen';
-
-type SectionProps = PropsWithChildren<{
-  title: string;
-}>;
-
-function Section({children, title}: SectionProps): React.JSX.Element {
-  const isDarkMode = useColorScheme() === 'dark';
-  return (
-    <View style={styles.sectionContainer}>
-      <Text
-        style={[
-          styles.sectionTitle,
-          {
-            color: isDarkMode ? Colors.white : Colors.black,
-          },
-        ]}>
-        {title}
-      </Text>
-      <Text
-        style={[
-          styles.sectionDescription,
-          {
-            color: isDarkMode ? Colors.light : Colors.dark,
-          },
-        ]}>
-        {children}
-      </Text>
-    </View>
-  );
-}
+import React, { useEffect, useState } from 'react';
+import { SafeAreaView, View, FlatList, Image, Text, TouchableOpacity, ScrollView } from 'react-native';
+import { Character } from './src/types';
+import { getCharacters } from './src/api';
+import styles from './src/styles';
 
 function App(): React.JSX.Element {
-  const isDarkMode = useColorScheme() === 'dark';
+  const [characters, setCharacters] = useState<Character[]>([]);
+  const [filteredCharacters, setFilteredCharacters] = useState<Character[]>([]);
+  const [selectedStatus, setSelectedStatus] = useState<string>('');
+  const [selectedLocations, setSelectedLocations] = useState<string[]>([]);
 
-  const backgroundStyle = {
-    backgroundColor: isDarkMode ? Colors.darker : Colors.lighter,
+  useEffect(() => {
+    const fetchCharacters = async () => {
+      try {
+        const data = await getCharacters();
+        setCharacters(data.results);
+        setFilteredCharacters(data.results);
+      } catch (error) {
+        console.error(error);
+      }
+    };
+
+    fetchCharacters();
+  }, []);
+
+  useEffect(() => {
+    setFilteredCharacters(
+      characters.filter((character) => 
+        (selectedStatus ? character.status === selectedStatus : true) &&
+        (selectedLocations.length > 0 ? selectedLocations.includes(character.location.name) : true)
+      )
+    );
+  }, [selectedStatus, selectedLocations, characters]);
+
+  const toggleLocation = (location: string) => {
+    setSelectedLocations((prevLocations) =>
+      prevLocations.includes(location)
+        ? prevLocations.filter((loc) => loc !== location)
+        : [...prevLocations, location]
+    );
   };
 
+  const uniqueLocations = Array.from(new Set(characters.map((character) => character.location.name)));
+
   return (
-    <SafeAreaView style={backgroundStyle}>
-      <StatusBar
-        barStyle={isDarkMode ? 'light-content' : 'dark-content'}
-        backgroundColor={backgroundStyle.backgroundColor}
-      />
-      <ScrollView
-        contentInsetAdjustmentBehavior="automatic"
-        style={backgroundStyle}>
-        <Header />
-        <View
-          style={{
-            backgroundColor: isDarkMode ? Colors.black : Colors.white,
-          }}>
-          <Section title="Step One">
-            Edit <Text style={styles.highlight}>App.tsx</Text> to change this
-            screen and then come back to see your edits.
-          </Section>
-          <Section title="See Your Changes">
-            <ReloadInstructions />
-          </Section>
-          <Section title="Debug">
-            <DebugInstructions />
-          </Section>
-          <Section title="Learn More">
-            Read the docs to discover what to do next:
-          </Section>
-          <LearnMoreLinks />
-        </View>
+    <SafeAreaView style={styles.container}>
+      <View style={styles.filterContainer}>
+        {['', 'Alive', 'Dead', 'unknown'].map(status => (
+          <TouchableOpacity
+            key={status}
+            style={[styles.filterButton, selectedStatus === status && styles.selectedFilter]}
+            onPress={() => setSelectedStatus(status)}
+          >
+            <Text style={styles.filterText}>{status || 'All'}</Text>
+          </TouchableOpacity>
+        ))}
+      </View>
+
+      <ScrollView horizontal contentContainerStyle={styles.locationContainer} showsHorizontalScrollIndicator={false}>
+        {uniqueLocations.map((location) => (
+          <TouchableOpacity
+            key={location}
+            style={[styles.locationButton, selectedLocations.includes(location) && styles.selectedLocation]}
+            onPress={() => toggleLocation(location)}
+          >
+            <Text style={styles.filterText}>{location}</Text>
+          </TouchableOpacity>
+        ))}
       </ScrollView>
+
+      <FlatList
+        data={filteredCharacters}
+        renderItem={({ item }: { item: Character }) => (
+          <View style={styles.item}>
+            <Image source={{ uri: item.image }} style={styles.image} />
+            <View style={styles.textContainer}>
+              <Text style={styles.name}>{item.name}</Text>
+              <Text style={styles.status}>{item.status}</Text>
+              <Text style={styles.location}>{item.location.name}</Text>
+            </View>
+          </View>
+        )}
+        keyExtractor={(item) => item.id.toString()}
+      />
     </SafeAreaView>
   );
 }
-
-const styles = StyleSheet.create({
-  sectionContainer: {
-    marginTop: 32,
-    paddingHorizontal: 24,
-  },
-  sectionTitle: {
-    fontSize: 24,
-    fontWeight: '600',
-  },
-  sectionDescription: {
-    marginTop: 8,
-    fontSize: 18,
-    fontWeight: '400',
-  },
-  highlight: {
-    fontWeight: '700',
-  },
-});
 
 export default App;
